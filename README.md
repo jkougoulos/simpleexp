@@ -1,0 +1,1 @@
+Experiment reading OData metadata and creating POCO classes
