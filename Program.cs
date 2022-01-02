@@ -22,6 +22,7 @@ class Program
 
 
         var modelabstr = await cl.GetMetadataAsync();
+        string modeltxt = await cl.GetMetadataAsStringAsync();
 
         if ( modelabstr.GetType().FullName.StartsWith("Microsoft.Data.Edm") )
         {
@@ -71,21 +72,28 @@ class Program
 
         }
 //        Console.WriteLine("Hello, World!");
+        string tmpfile = Guid.NewGuid() + ".xml";
+        await File.WriteAllTextAsync( tmpfile, modeltxt );
 
         var o2pconnstring = new OData2Poco.OdataConnectionString 
         {
-            ServiceUrl = _svcurl,
-            Authenticate = OData2Poco.Http.AuthenticationType.None
+            ServiceUrl = tmpfile
         };
 
         var o2psetting = new OData2Poco.PocoSetting
         {
-            AddNavigation = true,
-            AddKeyAttribute = true
+            AddNavigation = true
+
+            
+//            AddKeyAttribute = true, 
+            
         };
 
         var o2p = new O2P( o2psetting );
         var code = await o2p.GenerateAsync( o2pconnstring );
+
+        File.Delete( tmpfile );
+        
 
         Console.WriteLine( code );
 
