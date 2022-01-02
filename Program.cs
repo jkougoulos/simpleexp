@@ -13,8 +13,8 @@ using OData2Poco.Api;
 class Program
 {
 
-    private static string _svcurl = "https://services.odata.org/TripPinRESTierService/(S(jcidpq3drpzq0hefuabvtj5f))/"; // v4
-//    private static string _svcurl = "https://services.odata.org/V2/OData/OData.svc/"; // v2
+ //   private static string _svcurl = "https://services.odata.org/TripPinRESTierService/(S(jcidpq3drpzq0hefuabvtj5f))/"; // v4
+    private static string _svcurl = "https://services.odata.org/V2/OData/OData.svc/"; // v2
     static async Task<int> Main(string[] args)
     {
 
@@ -26,18 +26,43 @@ class Program
 
         if ( modelabstr.GetType().FullName.StartsWith("Microsoft.Data.Edm") )
         {
-            Microsoft.Data.Edm.IEdmModel model =  modelabstr as Microsoft.Data.Edm.IEdmModel ;
+            var model =  modelabstr as Microsoft.Data.Edm.IEdmModel ;
             
-            var entitySets = model.EntityContainers().FirstOrDefault().EntitySets();
+            var entitySets = model.EntityContainers()        // .FirstOrDefault().EntitySets()
+                                .SelectMany(c => c.Elements) // from odata2poco -> poco.cs @ 145
+                                .Where(x => x.ContainerElementKind == Microsoft.Data.Edm.EdmContainerElementKind.EntitySet)
+                                .Select(element => (Microsoft.Data.Edm.IEdmEntitySet) element);
+
+
             foreach ( var entitySet in entitySets )
             {
-                Console.WriteLine( entitySet.Name + "/" ); //+ entitySet );
+                Console.WriteLine( entitySet.Name + "/" + entitySet.ElementType.Name );
+
+                var type = entitySet.ElementType;
+                foreach ( var structProp in type.DeclaredStructuralProperties() )
+                {
+                    if ( !structProp.Type.IsCollection() )
+                    {
+                       var def = (Microsoft.Data.Edm.IEdmNamedElement) structProp.Type.Definition;
+                       Console.WriteLine("---Prop: " + structProp.Name + " / " + def.Name );
+                    }
+                    else
+                    {
+                        var def = (Microsoft.Data.Edm.IEdmCollectionType) structProp.Type.Definition;
+                        var elemType = (Microsoft.Data.Edm.IEdmNamedElement) def.ElementType.Definition; 
+                        Console.WriteLine("---Prop: " + structProp.Name + " / " + $"Collection({elemType.Name})" );
+                    }
+                }
+                foreach ( var navProp in type.DeclaredNavigationProperties() )
+                {
+                    Console.WriteLine("---NavProp: " + navProp.Name + " / " + navProp.Type.GetType().Name );
+                }
             }
 
         }
         else
         {
-            var model = (Microsoft.OData.Edm.EdmModelBase) await cl.GetMetadataAsync();
+            var model = (Microsoft.OData.Edm.EdmModelBase) modelabstr ; //await cl.GetMetadataAsync();
         
             var entitySets = model.EntityContainer.EntitySets();
 
@@ -82,8 +107,7 @@ class Program
 
         var o2psetting = new OData2Poco.PocoSetting
         {
-            AddNavigation = true
-
+            AddNavigation = true,
             
 //            AddKeyAttribute = true, 
             
@@ -93,9 +117,8 @@ class Program
         var code = await o2p.GenerateAsync( o2pconnstring );
 
         File.Delete( tmpfile );
-        
-
-        Console.WriteLine( code );
+ 
+   //     Console.WriteLine( code );
 
         return 0;
 
